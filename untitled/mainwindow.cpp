@@ -87,6 +87,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(player, &QMediaPlayer::durationChanged, this, &MainWindow::on_durationChanged);
     connect(player, &QMediaPlayer::positionChanged, this, &MainWindow::on_positionChanged);
     connect(player, &QMediaPlayer::playbackStateChanged, this, &MainWindow::on_playbackStateChanged);
+    connect(player, &QMediaPlayer::mediaStatusChanged, this, &MainWindow::on_mediaStatusChanged);
 
     // 歌词列表样式
     ui->lyricListWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -144,6 +145,14 @@ void MainWindow::on_positionChanged(qint64 pos)
 
     // 更新歌词显示
     updateLyricDisplay(pos);
+
+    // 检测歌曲即将结束（剩余不到500ms），触发切歌
+    if(totalTime > 0 && pos >= totalTime - 500
+       && player->playbackState() == QMediaPlayer::PlayingState
+       && !isSwitching)
+    {
+        playNext();
+    }
 }
 
 void MainWindow::on_playbackStateChanged(QMediaPlayer::PlaybackState state)
@@ -278,7 +287,10 @@ void MainWindow::on_mediaStatusChanged(QMediaPlayer::MediaStatus status)
     else if(status == QMediaPlayer::EndOfMedia)
     {
         if(!isSwitching)
-            playNext();
+        {
+            // 延迟到下一个事件循环执行，避免在信号处理中直接操作player
+            QTimer::singleShot(100, this, &MainWindow::playNext);
+        }
     }
 }
 
@@ -288,12 +300,16 @@ void MainWindow::playNext()
     if(musicList.isEmpty()) return;
     isSwitching = true;
 
+    qDebug() << "playNext() 触发, 当前模式:" << playMode << ", 当前索引:" << currentIndex;
+
     if(playMode == SINGLE_LOOP)
     {
         // 单曲循环：重新播放当前歌曲
         player->stop();
+        player->setSource(QUrl());  // 先清空
         player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
         player->play();
+        qDebug() << "单曲循环: 重新播放" << musicList[currentIndex];
     }
     else if(playMode == RANDOM_PLAY)
     {
@@ -306,11 +322,13 @@ void MainWindow::playNext()
             currentIndex = newIndex;
         }
         player->stop();
+        player->setSource(QUrl());
         player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
         player->play();
         updateCurrentSongLabel();
         loadLyrics(musicList[currentIndex]);
         loadAlbumArt(musicList[currentIndex]);
+        qDebug() << "随机播放: 切换到" << musicList[currentIndex];
     }
     else // ORDER_PLAY
     {
@@ -319,15 +337,17 @@ void MainWindow::playNext()
         else
             currentIndex = 0;
         player->stop();
+        player->setSource(QUrl());
         player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
         player->play();
         updateCurrentSongLabel();
         loadLyrics(musicList[currentIndex]);
         loadAlbumArt(musicList[currentIndex]);
+        qDebug() << "顺序播放: 切换到" << musicList[currentIndex];
     }
 
-    // 延迟重置标志，防止 EndOfMedia 再次触发
-    QTimer::singleShot(500, this, [this]() { isSwitching = false; });
+    // 延迟重置标志
+    QTimer::singleShot(1000, this, [this]() { isSwitching = false; });
 }
 
 // ===== 收起/展开播放列表 =====

@@ -102,5 +102,7 @@ make        # 或 nmake / mingw32-make
 - `connectSlotsByName` 自动连接按钮信号（按钮命名规范：`on_<objectName>_clicked`）
 - `QTimer` 每 50ms 刷新封面旋转角度
 - `QPainterPath` 圆形裁剪 + `QPainter::rotate` 实现旋转
-- `EndOfMedia` 状态触发切歌，`isSwitching` 标志位防止重复触发
+- 通过 `positionChanged` 检测歌曲剩余不足 500ms 触发切歌（Qt 6.11.1 的 `EndOfMedia` 信号不可靠）
+- `isSwitching` 标志位 + `QTimer::singleShot` 防止重复触发切歌
 - 歌词偏移量 `lyricOffset = 1000ms` 解决歌词超前问题
+- `setSource(QUrl())` 先清空再重设，确保单曲循环能重新加载同一文件
