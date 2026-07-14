@@ -1,0 +1,7 @@
+@echo off
+cd /d "D:\AAAAAAwork base\untitled\untitled\build\Desktop_Qt_6_11_1_MinGW_64_bit_Debug"
+echo === g++ version === > diag.txt
+g++ --version >> diag.txt 2>&1
+echo === compile main.cpp === >> diag.txt
+g++ -c -fno-keep-inline-dllexport -g -Wall -Wextra -Wextra -fexceptions -mthreads -DUNICODE -D_UNICODE -DWIN32 -DMINGW_HAS_SECURE_API=1 -DQT_QML_DEBUG -DQT_MULTIMEDIA_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_NETWORK_LIB -DQT_CORE_LIB -DQT_NEEDS_QMAIN -I../../../untitled -I. -ID:/qt/6.11.1/mingw_64/include -ID:/qt/6.11.1/mingw_64/include/QtMultimedia -ID:/qt/6.11.1/mingw_64/include/QtWidgets -ID:/qt/6.11.1/mingw_64/include/QtGui -ID:/qt/6.11.1/mingw_64/include/QtNetwork -ID:/qt/6.11.1/mingw_64/include/QtCore -Idebug -I. -I/include -ID:/qt/6.11.1/mingw_64/mkspecs/win32-g++ -o debug\main.o ..\..\main.cpp >> diag.txt 2>&1
+echo EXITCODE=%ERRORLEVEL% >> diag.txt
