@@ -147,7 +147,7 @@ void MainWindow::on_positionChanged(qint64 pos)
     updateLyricDisplay(pos);
 
     // 检测歌曲即将结束（剩余不到500ms），触发切歌
-    if(totalTime > 0 && pos >= totalTime - 500
+    if(totalTime > 1000 && pos >= totalTime - 500
        && player->playbackState() == QMediaPlayer::PlayingState
        && !isSwitching)
     {
@@ -299,6 +299,7 @@ void MainWindow::playNext()
 {
     if(musicList.isEmpty()) return;
     isSwitching = true;
+    totalTime = 0;  // 立即重置，防止positionChanged再次触发
 
     qDebug() << "playNext() 触发, 当前模式:" << playMode << ", 当前索引:" << currentIndex;
 
@@ -306,7 +307,7 @@ void MainWindow::playNext()
     {
         // 单曲循环：重新播放当前歌曲
         player->stop();
-        player->setSource(QUrl());  // 先清空
+        player->setSource(QUrl());
         player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
         player->play();
         qDebug() << "单曲循环: 重新播放" << musicList[currentIndex];
@@ -347,7 +348,7 @@ void MainWindow::playNext()
     }
 
     // 延迟重置标志
-    QTimer::singleShot(1000, this, [this]() { isSwitching = false; });
+    QTimer::singleShot(2000, this, [this]() { isSwitching = false; });
 }
 
 // ===== 收起/展开播放列表 =====
