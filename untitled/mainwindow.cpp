@@ -151,6 +151,7 @@ void MainWindow::on_positionChanged(qint64 pos)
        && player->playbackState() == QMediaPlayer::PlayingState
        && !isSwitching)
     {
+        qDebug() << "=== 即将切歌 === pos:" << pos << "totalTime:" << totalTime << "mode:" << playMode;
         playNext();
     }
 }
@@ -215,10 +216,29 @@ void MainWindow::on_playPauseBtn_clicked()
 void MainWindow::on_prevBtn_clicked()
 {
     if(musicList.isEmpty()) return;
-    if(currentIndex > 0)
-        currentIndex--;
+
+    if(playMode == RANDOM_PLAY)
+    {
+        // 随机模式：随机切一首
+        if(musicList.size() > 1)
+        {
+            int newIndex = currentIndex;
+            while(newIndex == currentIndex)
+                newIndex = QRandomGenerator::global()->bounded(0, musicList.size());
+            currentIndex = newIndex;
+        }
+    }
     else
-        currentIndex = musicList.size() - 1;
+    {
+        // 顺序/单曲循环：正常切上一首
+        if(currentIndex > 0)
+            currentIndex--;
+        else
+            currentIndex = musicList.size() - 1;
+    }
+
+    player->stop();
+    player->setSource(QUrl());
     player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
     player->play();
     updateCurrentSongLabel();
@@ -229,10 +249,29 @@ void MainWindow::on_prevBtn_clicked()
 void MainWindow::on_nextBtn_clicked()
 {
     if(musicList.isEmpty()) return;
-    if(currentIndex < musicList.size() - 1)
-        currentIndex++;
+
+    if(playMode == RANDOM_PLAY)
+    {
+        // 随机模式：随机切一首
+        if(musicList.size() > 1)
+        {
+            int newIndex = currentIndex;
+            while(newIndex == currentIndex)
+                newIndex = QRandomGenerator::global()->bounded(0, musicList.size());
+            currentIndex = newIndex;
+        }
+    }
     else
-        currentIndex = 0;
+    {
+        // 顺序/单曲循环：正常切下一首
+        if(currentIndex < musicList.size() - 1)
+            currentIndex++;
+        else
+            currentIndex = 0;
+    }
+
+    player->stop();
+    player->setSource(QUrl());
     player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
     player->play();
     updateCurrentSongLabel();
