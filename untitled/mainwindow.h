@@ -49,11 +49,14 @@ private slots:
     void updateCurrentSongLabel();
     void onVolumeChanged(int value);
     void rotateAlbumArt();
+    void onPlaylistItemDoubleClicked(QListWidgetItem *item);
 
 private:
     void loadLyrics(const QString &musicFilePath);
     void updateLyricDisplay(qint64 position);
     void loadAlbumArt(const QString &musicFilePath);
+    void refreshPlaylist();
+    void highlightCurrentPlaylistItem();
 
     Ui::MainWindow *ui;
     QMediaPlayer *player;

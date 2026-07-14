@@ -93,10 +93,16 @@ MainWindow::MainWindow(QWidget *parent)
     ui->lyricListWidget->setFocusPolicy(Qt::NoFocus);
     ui->lyricListWidget->setSelectionMode(QAbstractItemView::NoSelection);
 
+    // 播放列表：双击切歌
+    connect(ui->playlistWidget, &QListWidget::itemDoubleClicked, this, &MainWindow::onPlaylistItemDoubleClicked);
+
     // 封面旋转定时器
     rotateTimer = new QTimer(this);
     connect(rotateTimer, &QTimer::timeout, this, &MainWindow::rotateAlbumArt);
     rotateTimer->setInterval(50); // 每50ms旋转一次
+
+    // 刷新播放列表
+    refreshPlaylist();
 
     updateCurrentSongLabel();
 }
@@ -143,12 +149,12 @@ void MainWindow::on_playbackStateChanged(QMediaPlayer::PlaybackState state)
 {
     if(state == QMediaPlayer::PlayingState)
     {
-        ui->playPauseBtn->setText("| |");
+        ui->playPauseBtn->setText("||");
         rotateTimer->start();
     }
     else
     {
-        ui->playPauseBtn->setText(" ▷ ");
+        ui->playPauseBtn->setText("▶");
         rotateTimer->stop();
     }
 }
@@ -236,6 +242,7 @@ void MainWindow::on_openBtn_clicked()
         currentIndex = musicList.size() - files.size();
     if(currentIndex < 0) currentIndex = 0;
 
+    refreshPlaylist();
     player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
     updateCurrentSongLabel();
     loadLyrics(musicList[currentIndex]);
@@ -248,13 +255,14 @@ void MainWindow::updateCurrentSongLabel()
 {
     if(currentIndex >= 0 && currentIndex < musicList.size())
     {
-        QString songName = musicList[currentIndex].split("/").last();
-        ui->currentSongLabel->setText("当前播放: " + songName);
+        QFileInfo fi(musicList[currentIndex]);
+        ui->currentSongLabel->setText(fi.completeBaseName());
     }
     else
     {
-        ui->currentSongLabel->setText("当前播放: 未选择歌曲");
+        ui->currentSongLabel->setText("未选择歌曲");
     }
+    highlightCurrentPlaylistItem();
 }
 
 void MainWindow::on_mediaStatusChanged(QMediaPlayer::MediaStatus status)
@@ -266,26 +274,33 @@ void MainWindow::on_mediaStatusChanged(QMediaPlayer::MediaStatus status)
     else if(status == QMediaPlayer::EndOfMedia)
     {
         // 歌曲播放完毕，根据播放模式切换
-        if(playMode == ORDER_PLAY)
+        if(playMode == SINGLE_LOOP)
         {
-            if(currentIndex < musicList.size() - 1)
-                currentIndex++;
-            else
-                currentIndex = 0;
+            // 单曲循环：重新加载同一首
+            player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
+            player->play();
+        }
+        else if(playMode == RANDOM_PLAY)
+        {
+            int newIndex = QRandomGenerator::global()->bounded(0, musicList.size());
+            if(musicList.size() > 1)
+            {
+                while(newIndex == currentIndex)
+                    newIndex = QRandomGenerator::global()->bounded(0, musicList.size());
+            }
+            currentIndex = newIndex;
             player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
             player->play();
             updateCurrentSongLabel();
             loadLyrics(musicList[currentIndex]);
             loadAlbumArt(musicList[currentIndex]);
         }
-        else if(playMode == SINGLE_LOOP)
+        else // ORDER_PLAY
         {
-            player->setPosition(0);
-            player->play();
-        }
-        else if(playMode == RANDOM_PLAY)
-        {
-            currentIndex = QRandomGenerator::global()->bounded(0, musicList.size());
+            if(currentIndex < musicList.size() - 1)
+                currentIndex++;
+            else
+                currentIndex = 0;
             player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
             player->play();
             updateCurrentSongLabel();
@@ -303,13 +318,12 @@ void MainWindow::loadLyrics(const QString &musicFilePath)
     ui->lyricListWidget->clear();
 
     // 根据音乐文件路径找对应的 .lrc 文件
-    QString lrcPath = musicFilePath;
-    lrcPath.replace(QRegularExpression("\\.[^.]+$"), ".lrc");
+    QFileInfo fi(musicFilePath);
+    QString lrcPath = fi.absolutePath() + "/" + fi.completeBaseName() + ".lrc";
 
     QFile file(lrcPath);
     if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        // 没有歌词文件
         QListWidgetItem *item = new QListWidgetItem("暂无歌词");
         item->setTextAlignment(Qt::AlignCenter);
         ui->lyricListWidget->addItem(item);
@@ -479,4 +493,84 @@ void MainWindow::rotateAlbumArt()
     rotationAngle += 0.5;
     if(rotationAngle >= 360.0)
         rotationAngle -= 360.0;
+}
+
+// ===== 刷新播放列表 =====
+void MainWindow::refreshPlaylist()
+{
+    ui->playlistWidget->clear();
+    for(int i = 0; i < musicList.size(); i++)
+    {
+        QFileInfo fi(musicList[i]);
+        QString songName = fi.completeBaseName();
+
+        // 尝试加载缩略封面
+        QString imgPath = fi.absolutePath() + "/" + songName + ".jpg";
+        QPixmap thumb(imgPath);
+        if(thumb.isNull())
+        {
+            // 尝试 png
+            imgPath = fi.absolutePath() + "/" + songName + ".png";
+            thumb = QPixmap(imgPath);
+        }
+
+        QListWidgetItem *item = new QListWidgetItem();
+        item->setText(songName);
+        item->setData(Qt::UserRole, i); // 存储索引
+
+        if(!thumb.isNull())
+        {
+            // 缩放为 36x36 的缩略图
+            QPixmap scaled = thumb.scaled(36, 36, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+            // 裁剪为正方形
+            int x = (scaled.width() - 36) / 2;
+            int y = (scaled.height() - 36) / 2;
+            scaled = scaled.copy(x, y, 36, 36);
+            item->setIcon(QIcon(scaled));
+        }
+        else
+        {
+            // 默认图标
+            QPixmap defaultIcon(36, 36);
+            defaultIcon.fill(QColor("#2d2d4e"));
+            item->setIcon(QIcon(defaultIcon));
+        }
+
+        ui->playlistWidget->addItem(item);
+    }
+    ui->playlistWidget->setIconSize(QSize(36, 36));
+    highlightCurrentPlaylistItem();
+}
+
+// ===== 高亮当前播放歌曲 =====
+void MainWindow::highlightCurrentPlaylistItem()
+{
+    for(int i = 0; i < ui->playlistWidget->count(); i++)
+    {
+        QListWidgetItem *item = ui->playlistWidget->item(i);
+        if(i == currentIndex)
+        {
+            item->setSelected(true);
+            ui->playlistWidget->scrollToItem(item);
+        }
+        else
+        {
+            item->setSelected(false);
+        }
+    }
+}
+
+// ===== 双击播放列表切歌 =====
+void MainWindow::onPlaylistItemDoubleClicked(QListWidgetItem *item)
+{
+    int index = item->data(Qt::UserRole).toInt();
+    if(index >= 0 && index < musicList.size())
+    {
+        currentIndex = index;
+        player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
+        player->play();
+        updateCurrentSongLabel();
+        loadLyrics(musicList[currentIndex]);
+        loadAlbumArt(musicList[currentIndex]);
+    }
 }
