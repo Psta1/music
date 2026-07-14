@@ -23,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
     , currentLyricIndex(-1)
     , lyricOffset(1000)  // 歌词延迟1秒，解决歌词快于演唱的问题
     , rotationAngle(0.0)
+    , isSwitching(false)
 {
     ui->setupUi(this);
 
@@ -79,7 +80,7 @@ MainWindow::MainWindow(QWidget *parent)
     }
     else
     {
-        ui->currentSongLabel->setText("当前播放: 请点击\"打开歌曲\"选择音乐");
+        ui->currentSongLabel->setText("请点击\"添加歌曲\"选择音乐");
     }
 
     // 连接信号
@@ -188,7 +189,7 @@ void MainWindow::on_playPauseBtn_clicked()
 {
     if(musicList.isEmpty())
     {
-        QMessageBox::information(this, "提示", "请先点击\"打开歌曲\"选择音乐文件。");
+        QMessageBox::information(this, "提示", "请先点击\"添加歌曲\"选择音乐文件。");
         return;
     }
     if(player->playbackState() == QMediaPlayer::PlayingState)
@@ -233,21 +234,24 @@ void MainWindow::on_nextBtn_clicked()
 void MainWindow::on_openBtn_clicked()
 {
     QStringList files = QFileDialog::getOpenFileNames(
-        this, "选择音乐文件", QString(), "音频文件 (*.mp3 *.wav *.flac *.ogg *.m4a)");
+        this, "添加歌曲", QString(), "音频文件 (*.mp3 *.wav *.flac *.ogg *.m4a)");
     if(files.isEmpty())
         return;
 
     musicList.append(files);
-    if(currentIndex < 0 || currentIndex >= musicList.size())
-        currentIndex = musicList.size() - files.size();
-    if(currentIndex < 0) currentIndex = 0;
-
     refreshPlaylist();
-    player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
-    updateCurrentSongLabel();
-    loadLyrics(musicList[currentIndex]);
-    loadAlbumArt(musicList[currentIndex]);
-    player->play();
+
+    // 如果当前没有在播放任何歌曲，加载第一首新添加的
+    if(player->playbackState() == QMediaPlayer::StoppedState
+       && player->mediaStatus() == QMediaPlayer::NoMedia)
+    {
+        currentIndex = musicList.size() - files.size();
+        if(currentIndex < 0) currentIndex = 0;
+        player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
+        updateCurrentSongLabel();
+        loadLyrics(musicList[currentIndex]);
+        loadAlbumArt(musicList[currentIndex]);
+    }
 }
 
 
@@ -269,45 +273,68 @@ void MainWindow::on_mediaStatusChanged(QMediaPlayer::MediaStatus status)
 {
     if(status == QMediaPlayer::NoMedia)
     {
-        ui->currentSongLabel->setText("当前播放: 未选择歌曲");
+        ui->currentSongLabel->setText("未选择歌曲");
     }
     else if(status == QMediaPlayer::EndOfMedia)
     {
-        // 歌曲播放完毕，根据播放模式切换
-        if(playMode == SINGLE_LOOP)
-        {
-            // 单曲循环：重新加载同一首
-            player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
-            player->play();
-        }
-        else if(playMode == RANDOM_PLAY)
-        {
-            int newIndex = QRandomGenerator::global()->bounded(0, musicList.size());
-            if(musicList.size() > 1)
-            {
-                while(newIndex == currentIndex)
-                    newIndex = QRandomGenerator::global()->bounded(0, musicList.size());
-            }
-            currentIndex = newIndex;
-            player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
-            player->play();
-            updateCurrentSongLabel();
-            loadLyrics(musicList[currentIndex]);
-            loadAlbumArt(musicList[currentIndex]);
-        }
-        else // ORDER_PLAY
-        {
-            if(currentIndex < musicList.size() - 1)
-                currentIndex++;
-            else
-                currentIndex = 0;
-            player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
-            player->play();
-            updateCurrentSongLabel();
-            loadLyrics(musicList[currentIndex]);
-            loadAlbumArt(musicList[currentIndex]);
-        }
+        if(!isSwitching)
+            playNext();
     }
+}
+
+// ===== 统一切歌逻辑 =====
+void MainWindow::playNext()
+{
+    if(musicList.isEmpty()) return;
+    isSwitching = true;
+
+    if(playMode == SINGLE_LOOP)
+    {
+        // 单曲循环：重新播放当前歌曲
+        player->stop();
+        player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
+        player->play();
+    }
+    else if(playMode == RANDOM_PLAY)
+    {
+        // 随机播放：随机选一首不同的歌
+        if(musicList.size() > 1)
+        {
+            int newIndex = currentIndex;
+            while(newIndex == currentIndex)
+                newIndex = QRandomGenerator::global()->bounded(0, musicList.size());
+            currentIndex = newIndex;
+        }
+        player->stop();
+        player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
+        player->play();
+        updateCurrentSongLabel();
+        loadLyrics(musicList[currentIndex]);
+        loadAlbumArt(musicList[currentIndex]);
+    }
+    else // ORDER_PLAY
+    {
+        if(currentIndex < musicList.size() - 1)
+            currentIndex++;
+        else
+            currentIndex = 0;
+        player->stop();
+        player->setSource(QUrl::fromLocalFile(musicList[currentIndex]));
+        player->play();
+        updateCurrentSongLabel();
+        loadLyrics(musicList[currentIndex]);
+        loadAlbumArt(musicList[currentIndex]);
+    }
+
+    // 延迟重置标志，防止 EndOfMedia 再次触发
+    QTimer::singleShot(500, this, [this]() { isSwitching = false; });
+}
+
+// ===== 收起/展开播放列表 =====
+void MainWindow::on_togglePlaylistBtn_clicked()
+{
+    bool visible = ui->playlistWidget->isVisible();
+    ui->playlistWidget->setVisible(!visible);
 }
 
 // ===== 歌词解析 =====

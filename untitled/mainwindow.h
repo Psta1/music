@@ -39,7 +39,7 @@ private slots:
     void on_prevBtn_clicked();
     void on_nextBtn_clicked();
     void on_modeBtn_clicked();
-    void on_openBtn_clicked();
+    void on_openBtn_clicked();  // 改名为"添加歌曲"
     void on_playbackStateChanged(QMediaPlayer::PlaybackState state);
     void on_mediaStatusChanged(QMediaPlayer::MediaStatus status);
 
@@ -50,6 +50,7 @@ private slots:
     void onVolumeChanged(int value);
     void rotateAlbumArt();
     void onPlaylistItemDoubleClicked(QListWidgetItem *item);
+    void on_togglePlaylistBtn_clicked();
 
 private:
     void loadLyrics(const QString &musicFilePath);
@@ -57,6 +58,7 @@ private:
     void loadAlbumArt(const QString &musicFilePath);
     void refreshPlaylist();
     void highlightCurrentPlaylistItem();
+    void playNext();  // 统一切歌逻辑
 
     Ui::MainWindow *ui;
     QMediaPlayer *player;
@@ -75,5 +77,8 @@ private:
     QPixmap albumPixmap;
     qreal rotationAngle;
     QTimer *rotateTimer;
+
+    // 防止重复切歌
+    bool isSwitching;
 };
 #endif // MAINWINDOW_H

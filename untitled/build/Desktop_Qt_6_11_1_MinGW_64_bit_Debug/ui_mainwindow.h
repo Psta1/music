@@ -53,6 +53,7 @@ public:
     QSlider *volumeSlider;
     QLabel *volumeValueLabel;
     QPushButton *openBtn;
+    QPushButton *togglePlaylistBtn;
 
     void setupUi(QMainWindow *MainWindow)
     {
@@ -193,6 +194,12 @@ public:
 
         controlLayout->addWidget(openBtn);
 
+        togglePlaylistBtn = new QPushButton(bottomBar);
+        togglePlaylistBtn->setObjectName("togglePlaylistBtn");
+        togglePlaylistBtn->setMinimumSize(QSize(32, 32));
+
+        controlLayout->addWidget(togglePlaylistBtn);
+
 
         bottomLayout->addLayout(controlLayout);
 
@@ -284,7 +291,9 @@ public:
         volumeValueLabel->setText(QCoreApplication::translate("MainWindow", "100%", nullptr));
         volumeValueLabel->setStyleSheet(QCoreApplication::translate("MainWindow", "font-size: 11px; color: #6b6b8a;", nullptr));
         openBtn->setStyleSheet(QCoreApplication::translate("MainWindow", "QPushButton { background-color: transparent; color: #8b8b9e; border: none; font-size: 12px; padding: 4px 8px; } QPushButton:hover { color: #ffffff; }", nullptr));
-        openBtn->setText(QCoreApplication::translate("MainWindow", "\346\211\223\345\274\200\346\255\214\346\233\262", nullptr));
+        openBtn->setText(QCoreApplication::translate("MainWindow", "\346\267\273\345\212\240\346\255\214\346\233\262", nullptr));
+        togglePlaylistBtn->setStyleSheet(QCoreApplication::translate("MainWindow", "QPushButton { background-color: transparent; color: #8b8b9e; border: none; font-size: 14px; } QPushButton:hover { color: #ffffff; }", nullptr));
+        togglePlaylistBtn->setText(QCoreApplication::translate("MainWindow", "\342\211\241", nullptr));
     } // retranslateUi
 
 };
